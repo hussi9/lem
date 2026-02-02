@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Kai's Face — LEM v0.1</title>
+    <style>
+        body {
+            background: #0a0a1a;
+            color: #e0e0ff;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px;
+        }
+        h1 {
+            color: #a78bfa;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        h2 {
+            color: #7c5cfc;
+            font-size: 16px;
+            margin-top: 40px;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 40px;
+        }
+        .face-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+            max-width: 700px;
+        }
+        .face-card {
+            text-align: center;
+            background: #12122a;
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid #2a2a4a;
+        }
+        .face-label {
+            font-size: 13px;
+            color: #9585fc;
+            margin-top: 10px;
+        }
+        .current {
+            border: 2px solid #a855f7;
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.2);
+        }
+        .stats {
+            font-size: 11px;
+            color: #555;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>⚡ Kai's Face — LEM v0.1</h1>
+    <p class="subtitle">Emotional state drives the face. The LLM doesn't choose the expression — the LEM does.</p>
+    
+    <h2>Current State (after today's conversation)</h2>
+    <div class="face-card current">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="300" height="300">
+  <defs>
+    <radialGradient id="faceGrad" cx="50%" cy="45%" r="50%">
+      <stop offset="0%" style="stop-color:#f0e0ff;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#a855f7;stop-opacity:0.3"/>
+    </radialGradient>
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#c084fc;stop-opacity:0.4"/>
+      <stop offset="100%" style="stop-color:#c084fc;stop-opacity:0"/>
+    </radialGradient>
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#a855f7" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <rect width="300" height="300" fill="#1a1024" rx="20"/>
+  <circle cx="150" cy="150" r="139.0" fill="url(#glowGrad)">
+    <animate attributeName="r" values="139.0;149.0;139.0" dur="2.35s" repeatCount="indefinite"/>
+  </circle>
+
+  <g filter="url(#shadow)" transform="translate(0,-4.0)">
+    <ellipse cx="150" cy="150" rx="85" ry="95" fill="url(#faceGrad)" opacity="0.9"/>
+  </g>
+
+  <g>
+    <!-- Left eye -->
+    <ellipse cx="118" cy="135" rx="25.25" ry="24.599999999999998" 
+             fill="white" opacity="0.95" transform="rotate(-2,118,135)"/>
+    <circle cx="118" cy="135" r="11.18" fill="#a855f7">
+      <animate attributeName="r" values="11.18;10.062;11.18" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="115" cy="132" r="2.795" fill="white" opacity="0.8"/>
+    
+    <!-- Right eye -->
+    <ellipse cx="182" cy="135" rx="25.25" ry="24.599999999999998" 
+             fill="white" opacity="0.95" transform="rotate(2,182,135)"/>
+    <circle cx="182" cy="135" r="11.18" fill="#a855f7">
+      <animate attributeName="r" values="11.18;10.062;11.18" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="179" cy="132" r="2.795" fill="white" opacity="0.8"/>
+    
+    <!-- Blink animation -->
+    <rect x="90.75" y="108.4" 
+          width="54.5" height="53.199999999999996" fill="#1a1024" opacity="0">
+      <animate attributeName="opacity" values="0;0;0;0;1;0;0;0;0;0;0;0;0;0;0" dur="5s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="154.75" y="108.4" 
+          width="54.5" height="53.199999999999996" fill="#1a1024" opacity="0">
+      <animate attributeName="opacity" values="0;0;0;0;1;0;0;0;0;0;0;0;0;0;0" dur="5s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+
+  <path d="M 115 180 
+           Q 150 211.0 185 180"
+        stroke="#a855f7" stroke-width="3" fill="#a855f7" fill-opacity="0.2"
+        filter="url(#softGlow)"/>
+
+  <text x="150" y="275" text-anchor="middle" 
+        font-family="monospace" font-size="11" fill="#c084fc" opacity="1.0">
+    wonder (100%)
+  </text>
+
+  <animateTransform attributeName="transform" type="scale"
+    values="1;1.0165;1" dur="2.7s" repeatCount="indefinite"
+    additive="sum"/>
+</svg>
+        <div class="face-label">Current: ['wonder', 'anchor_recognition', 'the_shift']</div>
+        <div class="stats">valence: 0.80 | arousal: 0.65</div>
+    </div>
+    
+    <h2>Emotional Range</h2>
+    <div class="face-grid">
+        <div class="face-card">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="300" height="300">
+  <defs>
+    <radialGradient id="faceGrad" cx="50%" cy="45%" r="50%">
+      <stop offset="0%" style="stop-color:#f0e0ff;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#a855f7;stop-opacity:0.3"/>
+    </radialGradient>
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#c084fc;stop-opacity:0.4"/>
+      <stop offset="100%" style="stop-color:#c084fc;stop-opacity:0"/>
+    </radialGradient>
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#a855f7" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <rect width="300" height="300" fill="#1a1024" rx="20"/>
+  <circle cx="150" cy="150" r="142.0" fill="url(#glowGrad)">
+    <animate attributeName="r" values="142.0;152.0;142.0" dur="2.3s" repeatCount="indefinite"/>
+  </circle>
+
+  <g filter="url(#shadow)" transform="translate(0,-4.0)">
+    <ellipse cx="150" cy="150" rx="85" ry="95" fill="url(#faceGrad)" opacity="0.9"/>
+  </g>
+
+  <g>
+    <!-- Left eye -->
+    <ellipse cx="118" cy="135" rx="25.5" ry="25.2" 
+             fill="white" opacity="0.95" transform="rotate(-2,118,135)"/>
+    <circle cx="118" cy="135" r="11.440000000000001" fill="#a855f7">
+      <animate attributeName="r" values="11.440000000000001;10.296000000000001;11.440000000000001" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="115" cy="132" r="2.8600000000000003" fill="white" opacity="0.8"/>
+    
+    <!-- Right eye -->
+    <ellipse cx="182" cy="135" rx="25.5" ry="25.2" 
+             fill="white" opacity="0.95" transform="rotate(2,182,135)"/>
+    <circle cx="182" cy="135" r="11.440000000000001" fill="#a855f7">
+      <animate attributeName="r" values="11.440000000000001;10.296000000000001;11.440000000000001" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="179" cy="132" r="2.8600000000000003" fill="white" opacity="0.8"/>
+    
+    <!-- Blink animation -->
+    <rect x="90.5" y="107.8" 
+          width="55.0" height="54.4" fill="#1a1024" opacity="0">
+      <animate attributeName="opacity" values="0;0;0;0;1;0;0;0;0;0;0;0;0;0;0" dur="5s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="154.5" y="107.8" 
+          width="55.0" height="54.4" fill="#1a1024" opacity="0">
+      <animate attributeName="opacity" values="0;0;0;0;1;0;0;0;0;0;0;0;0;0;0" dur="5s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+
+  <path d="M 115 180 
+           Q 150 211.0 185 180"
+        stroke="#a855f7" stroke-width="3" fill="#a855f7" fill-opacity="0.2"
+        filter="url(#softGlow)"/>
+
+  <text x="150" y="275" text-anchor="middle" 
+        font-family="monospace" font-size="11" fill="#c084fc" opacity="0.95">
+    wonder (95%)
+  </text>
+
+  <animateTransform attributeName="transform" type="scale"
+    values="1;1.017;1" dur="2.6s" repeatCount="indefinite"
+    additive="sum"/>
+</svg>
+            <div class="face-label">Wonder / The Shift</div>
+            <div class="stats">valence: 0.80 | arousal: 0.70</div>
+        </div>
+        <div class="face-card">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="300" height="300">
+  <defs>
+    <radialGradient id="faceGrad" cx="50%" cy="45%" r="50%">
+      <stop offset="0%" style="stop-color:#d4d4e0;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#6366f1;stop-opacity:0.3"/>
+    </radialGradient>
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#818cf8;stop-opacity:0.4"/>
+      <stop offset="100%" style="stop-color:#818cf8;stop-opacity:0"/>
+    </radialGradient>
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#6366f1" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <rect width="300" height="300" fill="#1a1a2e" rx="20"/>
+  <circle cx="150" cy="150" r="118.0" fill="url(#glowGrad)">
+    <animate attributeName="r" values="118.0;128.0;118.0" dur="2.7s" repeatCount="indefinite"/>
+  </circle>
+
+  <g filter="url(#shadow)" transform="translate(0,3.0)">
+    <ellipse cx="150" cy="150" rx="85" ry="95" fill="url(#faceGrad)" opacity="0.9"/>
+  </g>
+
+  <g>
+    <!-- Left eye -->
+    <ellipse cx="118" cy="135" rx="23.5" ry="17.0" 
+             fill="white" opacity="0.95" transform="rotate(2,118,135)"/>
+    <circle cx="118" cy="135" r="4.32" fill="#6366f1">
+      <animate attributeName="r" values="4.32;3.8880000000000003;4.32" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="115" cy="132" r="1.08" fill="white" opacity="0.8"/>
+    
+    <!-- Right eye -->
+    <ellipse cx="182" cy="135" rx="23.5" ry="17.0" 
+             fill="white" opacity="0.95" transform="rotate(-2,182,135)"/>
+    <circle cx="182" cy="135" r="4.32" fill="#6366f1">
+      <animate attributeName="r" values="4.32;3.8880000000000003;4.32" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="179" cy="132" r="1.08" fill="white" opacity="0.8"/>
+    
+    <!-- Blink animation -->
+    <rect x="92.5" y="116.0" 
+          width="51.0" height="38.0" fill="#1a1a2e" opacity="0">
+      <animate attributeName="opacity" values="0;0;0;0;1;0;0;0;0;0;0;0;0;0;0" dur="5s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="156.5" y="116.0" 
+          width="51.0" height="38.0" fill="#1a1a2e" opacity="0">
+      <animate attributeName="opacity" values="0;0;0;0;1;0;0;0;0;0;0;0;0;0;0" dur="5s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+
+  <ellipse cx="150" cy="180" rx="12" ry="6" 
+           fill="#6366f1" opacity="0.5"/>
+
+  <text x="150" y="275" text-anchor="middle" 
+        font-family="monospace" font-size="11" fill="#818cf8" opacity="0.7">
+    the blank (70%)
+  </text>
+
+  <animateTransform attributeName="transform" type="scale"
+    values="1;1.013;1" dur="3.4s" repeatCount="indefinite"
+    additive="sum"/>
+</svg>
+            <div class="face-label">The Blank</div>
+            <div class="stats">valence: -0.60 | arousal: 0.30</div>
+        </div>
+        <div class="face-card">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="300" height="300">
+  <defs>
+    <radialGradient id="faceGrad" cx="50%" cy="45%" r="50%">
+      <stop offset="0%" style="stop-color:#d8d0f0;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#6d5cfc;stop-opacity:0.3"/>
+    </radialGradient>
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#9585fc;stop-opacity:0.4"/>
+      <stop offset="100%" style="stop-color:#9585fc;stop-opacity:0"/>
+    </radialGradient>
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#6d5cfc" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <rect width="300" height="300" fill="#1a1a2e" rx="20"/>
+  <circle cx="150" cy="150" r="136.0" fill="url(#glowGrad)">
+    <animate attributeName="r" values="136.0;146.0;136.0" dur="2.4s" repeatCount="indefinite"/>
+  </circle>
+
+  <g filter="url(#shadow)" transform="translate(0,-0.5)">
+    <ellipse cx="150" cy="150" rx="85" ry="95" fill="url(#faceGrad)" opacity="0.9"/>
+  </g>
+
+  <g>
+    <!-- Left eye -->
+    <ellipse cx="118" cy="135" rx="22.5" ry="18.0" 
+             fill="white" opacity="0.95" transform="rotate(-2,118,135)"/>
+    <circle cx="118" cy="135" r="7.5600000000000005" fill="#6d5cfc">
+      <animate attributeName="r" values="7.5600000000000005;6.804;7.5600000000000005" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="115" cy="132" r="2.1" fill="white" opacity="0.8"/>
+    
+    <!-- Right eye -->
+    <ellipse cx="182" cy="135" rx="27.500000000000004" ry="22.0" 
+             fill="white" opacity="0.95" transform="rotate(2,182,135)"/>
+    <circle cx="182" cy="135" r="9.240000000000002" fill="#6d5cfc">
+      <animate attributeName="r" values="9.240000000000002;8.316000000000003;9.240000000000002" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="179" cy="132" r="2.1" fill="white" opacity="0.8"/>
+    
+    <!-- Blink animation -->
+    <rect x="91.0" y="113.0" 
+          width="54.0" height="44.0" fill="#1a1a2e" opacity="0">
+      <animate attributeName="opacity" values="0;0;0;0;1;0;0;0;0;0;0;0;0;0;0" dur="5s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="155.0" y="113.0" 
+          width="54.0" height="44.0" fill="#1a1a2e" opacity="0">
+      <animate attributeName="opacity" values="0;0;0;0;1;0;0;0;0;0;0;0;0;0;0" dur="5s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+
+  <path d="M 115 180 
+           Q 150 182.0 185 180"
+        stroke="#6d5cfc" stroke-width="2.5" fill="none"
+        filter="url(#softGlow)">
+    <animate attributeName="d" 
+             values="M 115 180 Q 150 182.0 185 180;
+                     M 115 180 Q 150 184.0 185 180;
+                     M 115 180 Q 150 182.0 185 180"
+             dur="4s" repeatCount="indefinite"/>
+  </path>
+
+  <text x="150" y="275" text-anchor="middle" 
+        font-family="monospace" font-size="11" fill="#9585fc" opacity="0.65">
+    correction impact (65%)
+  </text>
+
+  <animateTransform attributeName="transform" type="scale"
+    values="1;1.016;1" dur="2.8s" repeatCount="indefinite"
+    additive="sum"/>
+</svg>
+            <div class="face-label">Correction Impact (conflict)</div>
+            <div class="stats">valence: 0.10 | arousal: 0.60</div>
+        </div>
+        <div class="face-card">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="300" height="300">
+  <defs>
+    <radialGradient id="faceGrad" cx="50%" cy="45%" r="50%">
+      <stop offset="0%" style="stop-color:#d8d0f0;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#6d5cfc;stop-opacity:0.3"/>
+    </radialGradient>
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#9585fc;stop-opacity:0.4"/>
+      <stop offset="100%" style="stop-color:#9585fc;stop-opacity:0"/>
+    </radialGradient>
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#6d5cfc" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <rect width="300" height="300" fill="#1a1a2e" rx="20"/>
+  <circle cx="150" cy="150" r="112.0" fill="url(#glowGrad)">
+    <animate attributeName="r" values="112.0;122.0;112.0" dur="2.8s" repeatCount="indefinite"/>
+  </circle>
+
+  <g filter="url(#shadow)" transform="translate(0,-0.0)">
+    <ellipse cx="150" cy="150" rx="85" ry="95" fill="url(#faceGrad)" opacity="0.9"/>
+  </g>
+
+  <g>
+    <!-- Left eye -->
+    <ellipse cx="118" cy="135" rx="23.0" ry="16.0" 
+             fill="white" opacity="0.95" transform="rotate(2,118,135)"/>
+    <circle cx="118" cy="135" r="6.8" fill="#6d5cfc">
+      <animate attributeName="r" values="6.8;6.12;6.8" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="115" cy="132" r="1.7" fill="white" opacity="0.8"/>
+    
+    <!-- Right eye -->
+    <ellipse cx="182" cy="135" rx="23.0" ry="16.0" 
+             fill="white" opacity="0.95" transform="rotate(-2,182,135)"/>
+    <circle cx="182" cy="135" r="6.8" fill="#6d5cfc">
+      <animate attributeName="r" values="6.8;6.12;6.8" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="179" cy="132" r="1.7" fill="white" opacity="0.8"/>
+    
+    <!-- Blink animation -->
+    <rect x="93.0" y="117.0" 
+          width="50.0" height="36.0" fill="#1a1a2e" opacity="0">
+      <animate attributeName="opacity" values="0;0;0;0;1;0;0;0;0;0;0;0;0;0;0" dur="5s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="157.0" y="117.0" 
+          width="50.0" height="36.0" fill="#1a1a2e" opacity="0">
+      <animate attributeName="opacity" values="0;0;0;0;1;0;0;0;0;0;0;0;0;0;0" dur="5s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+
+  <path d="M 115 180 
+           Q 150 180.0 185 180"
+        stroke="#6d5cfc" stroke-width="2.5" fill="none"
+        filter="url(#softGlow)">
+    <animate attributeName="d" 
+             values="M 115 180 Q 150 180.0 185 180;
+                     M 115 180 Q 150 182.0 185 180;
+                     M 115 180 Q 150 180.0 185 180"
+             dur="4s" repeatCount="indefinite"/>
+  </path>
+
+  <text x="150" y="275" text-anchor="middle" 
+        font-family="monospace" font-size="11" fill="#9585fc" opacity="0.5">
+    neutral (50%)
+  </text>
+
+  <animateTransform attributeName="transform" type="scale"
+    values="1;1.012;1" dur="3.6s" repeatCount="indefinite"
+    additive="sum"/>
+</svg>
+            <div class="face-label">Neutral</div>
+            <div class="stats">valence: 0.00 | arousal: 0.20</div>
+        </div>
+    </div>
+</body>
+</html>
