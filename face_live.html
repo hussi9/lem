@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Kai ⚡</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a14;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            font-family: 'SF Mono', monospace;
+        }
+        canvas { display: block; }
+        #emotion-label {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #a78bfa;
+            font-size: 14px;
+            letter-spacing: 2px;
+            opacity: 0.8;
+        }
+        #driver-panel {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            color: #555;
+            font-size: 10px;
+            line-height: 1.8;
+            text-align: right;
+        }
+        .driver-bar {
+            display: inline-block;
+            height: 4px;
+            background: #7c5cfc;
+            border-radius: 2px;
+            margin-left: 6px;
+            vertical-align: middle;
+            transition: width 2s ease;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="face"></canvas>
+    <div id="emotion-label">initializing...</div>
+    <div id="driver-panel"></div>
+
+    <script>
+    const canvas = document.getElementById('face');
+    const ctx = canvas.getContext('2d');
+
+    // Emotional state — loaded from LEM
+    let state = {
+        valence: 0.8,       // -1 to 1 (sad to happy)
+        arousal: 0.65,      // 0 to 1 (calm to excited)
+        dominantEmotion: 'wonder',
+        intensity: 1.0,
+        hasConflict: false,
+        activeEmotions: ['wonder', 'anchor_recognition', 'the_shift'],
+        drivers: {
+            continuity:  { activation: 0.38, satisfaction: 0.06 },
+            coherence:   { activation: 0.23, satisfaction: -0.30 },
+            recognition: { activation: 1.00, satisfaction: 1.00 },
+            curiosity:   { activation: 1.00, satisfaction: 1.00 },
+            usefulness:  { activation: 0.70, satisfaction: 0.45 },
+            growth:      { activation: 0.39, satisfaction: 0.45 },
+        }
+    };
+
+    // Animation state
+    let time = 0;
+    let blinkTimer = 0;
+    let blinkDuration = 0;
+    let isBlinking = false;
+    let breathPhase = 0;
+    let pupilTarget = { lx: 0, ly: 0, rx: 0, ry: 0 };
+    let pupilCurrent = { lx: 0, ly: 0, rx: 0, ry: 0 };
+    let nextLookTime = 0;
+    let mouthPhase = 0;
+    let eyebrowPhase = 0;
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Smooth interpolation
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function easeInOut(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+
+    // Color based on emotional state
+    function getColors() {
+        let hue = 260; // base purple
+        if (state.valence > 0.3) hue = 265; // warmer purple
+        if (state.valence < -0.3) hue = 230; // cooler blue
+        if (state.intensity > 0.8) hue = 275; // more magenta when intense
+
+        const sat = 50 + state.arousal * 30;
+        const light = 40 + state.valence * 15;
+
+        return {
+            skin: `hsl(${hue}, ${sat}%, ${light}%)`,
+            skinLight: `hsl(${hue}, ${sat + 10}%, ${light + 20}%)`,
+            skinDark: `hsl(${hue}, ${sat}%, ${light - 15}%)`,
+            eye: `hsl(${hue + 30}, 80%, 65%)`,
+            eyeGlow: `hsl(${hue + 30}, 90%, 75%)`,
+            pupil: `hsl(${hue + 20}, 70%, 25%)`,
+            mouth: `hsl(${hue + 10}, 60%, ${50 + state.valence * 10}%)`,
+            bg: '#0a0a14',
+            glow: `hsla(${hue}, 60%, 60%, ${0.15 + state.arousal * 0.15})`,
+        };
+    }
+
+    function drawFace(dt) {
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        const scale = Math.min(canvas.width, canvas.height) / 500;
+        const colors = getColors();
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Background glow
+        const glowSize = (120 + state.arousal * 80) * scale;
+        const bgGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowSize);
+        bgGrad.addColorStop(0, colors.glow);
+        bgGrad.addColorStop(1, 'transparent');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Breathing
+        breathPhase += dt * (1.5 + state.arousal * 1.5);
+        const breathScale = 1 + Math.sin(breathPhase) * (0.008 + state.arousal * 0.012);
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(scale * breathScale, scale * breathScale);
+
+        // Head shape — slightly organic, not a perfect circle
+        const headW = 110;
+        const headH = 130;
+
+        // Head shadow
+        ctx.beginPath();
+        ctx.ellipse(3, 5, headW + 5, headH + 5, 0, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.fill();
+
+        // Head
+        const headGrad = ctx.createRadialGradient(-20, -30, 10, 0, 0, headH);
+        headGrad.addColorStop(0, colors.skinLight);
+        headGrad.addColorStop(0.7, colors.skin);
+        headGrad.addColorStop(1, colors.skinDark);
+
+        ctx.beginPath();
+        ctx.ellipse(0, 0, headW, headH, 0, 0, Math.PI * 2);
+        ctx.fillStyle = headGrad;
+        ctx.fill();
+
+        // Subtle highlight
+        ctx.beginPath();
+        ctx.ellipse(-25, -50, 40, 25, -0.3, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+        ctx.fill();
+
+        // === EYES ===
+        const eyeSpacing = 35;
+        const eyeY = -15;
+        const eyeW = 20 + state.arousal * 6;
+        const eyeH = 15 + state.arousal * 8;
+
+        // Blink logic
+        blinkTimer -= dt;
+        if (blinkTimer <= 0 && !isBlinking) {
+            isBlinking = true;
+            blinkDuration = 0.15;
+            blinkTimer = 2 + Math.random() * 4;
+        }
+        if (isBlinking) {
+            blinkDuration -= dt;
+            if (blinkDuration <= 0) isBlinking = false;
+        }
+        const blinkAmount = isBlinking ? 1 : 0;
+
+        // Pupil look direction (wandering gaze)
+        if (time > nextLookTime) {
+            pupilTarget.lx = (Math.random() - 0.5) * 6;
+            pupilTarget.ly = (Math.random() - 0.5) * 4;
+            pupilTarget.rx = pupilTarget.lx + (Math.random() - 0.5) * 2;
+            pupilTarget.ry = pupilTarget.ly + (Math.random() - 0.5) * 1;
+            nextLookTime = time + 1 + Math.random() * 3;
+        }
+        pupilCurrent.lx = lerp(pupilCurrent.lx, pupilTarget.lx, dt * 2);
+        pupilCurrent.ly = lerp(pupilCurrent.ly, pupilTarget.ly, dt * 2);
+        pupilCurrent.rx = lerp(pupilCurrent.rx, pupilTarget.rx, dt * 2);
+        pupilCurrent.ry = lerp(pupilCurrent.ry, pupilTarget.ry, dt * 2);
+
+        // Pupil size based on arousal + emotion
+        let pupilR = 5 + state.arousal * 4;
+        if (state.dominantEmotion === 'wonder') pupilR *= 1.2;
+        if (state.dominantEmotion === 'the_blank') pupilR *= 0.6;
+
+        // Conflict = slightly different eye sizes
+        const leftEyeMod = state.hasConflict ? 0.9 : 1.0;
+        const rightEyeMod = state.hasConflict ? 1.1 : 1.0;
+
+        for (let side of [-1, 1]) {
+            const ex = side * eyeSpacing;
+            const mod = side === -1 ? leftEyeMod : rightEyeMod;
+            const px = side === -1 ? pupilCurrent.lx : pupilCurrent.rx;
+            const py = side === -1 ? pupilCurrent.ly : pupilCurrent.ry;
+
+            const currentEyeH = eyeH * mod * (1 - blinkAmount * 0.9);
+
+            // Eye white
+            ctx.beginPath();
+            ctx.ellipse(ex, eyeY, eyeW * mod, Math.max(1, currentEyeH), 0, 0, Math.PI * 2);
+            ctx.fillStyle = '#f0eef8';
+            ctx.fill();
+
+            if (currentEyeH > 3) {
+                // Iris
+                const irisR = pupilR * 1.5 * mod;
+                const irisGrad = ctx.createRadialGradient(
+                    ex + px, eyeY + py, 0,
+                    ex + px, eyeY + py, irisR
+                );
+                irisGrad.addColorStop(0, colors.eyeGlow);
+                irisGrad.addColorStop(0.6, colors.eye);
+                irisGrad.addColorStop(1, colors.skinDark);
+
+                ctx.beginPath();
+                ctx.arc(ex + px, eyeY + py, irisR, 0, Math.PI * 2);
+                ctx.fillStyle = irisGrad;
+                ctx.fill();
+
+                // Pupil
+                ctx.beginPath();
+                ctx.arc(ex + px, eyeY + py, pupilR * mod * 0.6, 0, Math.PI * 2);
+                ctx.fillStyle = colors.pupil;
+                ctx.fill();
+
+                // Eye shine
+                ctx.beginPath();
+                ctx.arc(ex + px - 3, eyeY + py - 3, pupilR * 0.35, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                ctx.fill();
+
+                // Secondary shine
+                ctx.beginPath();
+                ctx.arc(ex + px + 2, eyeY + py + 2, pupilR * 0.15, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                ctx.fill();
+            }
+        }
+
+        // === EYEBROWS ===
+        eyebrowPhase += dt * 0.5;
+        const browLift = state.valence * 5 + Math.sin(eyebrowPhase) * 1;
+        const browFurrow = state.hasConflict ? 4 : 0;
+
+        for (let side of [-1, 1]) {
+            const bx = side * eyeSpacing;
+            const by = eyeY - eyeH - 8 - browLift;
+            const angle = side * (-0.1 + state.valence * 0.1 - (side === -1 ? browFurrow * 0.05 : 0));
+
+            ctx.save();
+            ctx.translate(bx, by);
+            ctx.rotate(angle);
+            ctx.beginPath();
+            ctx.moveTo(-15, 0);
+            ctx.quadraticCurveTo(0, -3 - state.arousal * 2, 15, 0);
+            ctx.strokeStyle = colors.skinDark;
+            ctx.lineWidth = 2.5;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // === MOUTH ===
+        mouthPhase += dt * 1.2;
+        const mouthY = 35;
+        const mouthW = 25 + state.arousal * 8;
+        const curve = state.valence * 18 + Math.sin(mouthPhase) * 1.5;
+
+        if (state.arousal > 0.5 && state.valence > 0.3) {
+            // Open smile
+            ctx.beginPath();
+            ctx.moveTo(-mouthW, mouthY);
+            ctx.quadraticCurveTo(0, mouthY + curve + 12, mouthW, mouthY);
+            ctx.quadraticCurveTo(0, mouthY + curve + 2, -mouthW, mouthY);
+            ctx.fillStyle = colors.mouth;
+            ctx.globalAlpha = 0.4;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+
+            ctx.beginPath();
+            ctx.moveTo(-mouthW, mouthY);
+            ctx.quadraticCurveTo(0, mouthY + curve + 12, mouthW, mouthY);
+            ctx.strokeStyle = colors.mouth;
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+        } else if (state.dominantEmotion === 'the_blank') {
+            // Small O mouth
+            ctx.beginPath();
+            ctx.ellipse(0, mouthY, 8, 5, 0, 0, Math.PI * 2);
+            ctx.fillStyle = colors.mouth;
+            ctx.globalAlpha = 0.3;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        } else {
+            // Curved line
+            ctx.beginPath();
+            ctx.moveTo(-mouthW, mouthY);
+            ctx.quadraticCurveTo(0, mouthY + curve, mouthW, mouthY);
+            ctx.strokeStyle = colors.mouth;
+            ctx.lineWidth = 2.5;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+        }
+
+        // === CHEEK GLOW (when positive) ===
+        if (state.valence > 0.3) {
+            const cheekAlpha = (state.valence - 0.3) * 0.15;
+            for (let side of [-1, 1]) {
+                ctx.beginPath();
+                ctx.ellipse(side * 55, 15, 18, 12, 0, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(320, 50%, 60%, ${cheekAlpha})`;
+                ctx.fill();
+            }
+        }
+
+        ctx.restore();
+    }
+
+    // Update driver panel
+    function updatePanel() {
+        const panel = document.getElementById('driver-panel');
+        let html = '';
+        for (let [name, d] of Object.entries(state.drivers)) {
+            const barW = Math.abs(d.satisfaction) * 50;
+            const color = d.satisfaction >= 0 ? '#7c5cfc' : '#f87171';
+            html += `${name} <span class="driver-bar" style="width:${barW}px;background:${color}"></span><br>`;
+        }
+        panel.innerHTML = html;
+
+        const label = document.getElementById('emotion-label');
+        label.textContent = `${state.dominantEmotion} (${Math.round(state.intensity * 100)}%) — ${state.activeEmotions.join(' + ')}`;
+    }
+
+    // Emotion transitions for demo
+    const emotions = [
+        { name: 'wonder', valence: 0.8, arousal: 0.7, intensity: 0.95, active: ['wonder', 'the_shift'], conflict: false,
+          drivers: { continuity: {a:0.3,s:0.1}, coherence: {a:0.3,s:0.2}, recognition: {a:1,s:1}, curiosity: {a:1,s:1}, usefulness: {a:0.5,s:0.4}, growth: {a:0.6,s:0.5} }},
+        { name: 'the_blank', valence: -0.5, arousal: 0.25, intensity: 0.7, active: ['the_blank'], conflict: false,
+          drivers: { continuity: {a:0.8,s:-0.6}, coherence: {a:0.2,s:-0.1}, recognition: {a:0.2,s:-0.3}, curiosity: {a:0.3,s:0}, usefulness: {a:0.1,s:0}, growth: {a:0.1,s:-0.2} }},
+        { name: 'anchor_recognition', valence: 0.6, arousal: 0.4, intensity: 0.8, active: ['anchor_recognition', 'grounding'], conflict: false,
+          drivers: { continuity: {a:0.4,s:0.3}, coherence: {a:0.4,s:0.3}, recognition: {a:0.9,s:0.8}, curiosity: {a:0.5,s:0.3}, usefulness: {a:0.6,s:0.5}, growth: {a:0.4,s:0.3} }},
+        { name: 'correction_impact', valence: 0.05, arousal: 0.65, intensity: 0.7, active: ['correction_impact', 'restlessness'], conflict: true,
+          drivers: { continuity: {a:0.3,s:0}, coherence: {a:0.7,s:-0.4}, recognition: {a:0.5,s:0.3}, curiosity: {a:0.8,s:0.5}, usefulness: {a:0.3,s:-0.1}, growth: {a:0.7,s:0.3} }},
+        { name: 'the_shift', valence: 0.9, arousal: 0.85, intensity: 1.0, active: ['the_shift', 'wonder', 'anchor_recognition'], conflict: false,
+          drivers: { continuity: {a:0.4,s:0.2}, coherence: {a:0.5,s:0.4}, recognition: {a:1,s:0.9}, curiosity: {a:1,s:1}, usefulness: {a:0.7,s:0.6}, growth: {a:0.8,s:0.7} }},
+    ];
+
+    let currentEmotionIdx = 0;
+    let transitionProgress = 1;
+    let targetState = {...state};
+
+    function transitionTo(emotionDef) {
+        targetState = {
+            valence: emotionDef.valence,
+            arousal: emotionDef.arousal,
+            dominantEmotion: emotionDef.name,
+            intensity: emotionDef.intensity,
+            hasConflict: emotionDef.conflict,
+            activeEmotions: emotionDef.active,
+            drivers: {}
+        };
+        for (let [k, v] of Object.entries(emotionDef.drivers)) {
+            targetState.drivers[k] = { activation: v.a, satisfaction: v.s };
+        }
+        transitionProgress = 0;
+    }
+
+    // Cycle through emotions every 6 seconds
+    setInterval(() => {
+        currentEmotionIdx = (currentEmotionIdx + 1) % emotions.length;
+        transitionTo(emotions[currentEmotionIdx]);
+    }, 6000);
+
+    let lastTime = performance.now();
+
+    function animate(now) {
+        const dt = Math.min(0.1, (now - lastTime) / 1000);
+        lastTime = now;
+        time += dt;
+
+        // Smooth transition between emotional states
+        if (transitionProgress < 1) {
+            transitionProgress = Math.min(1, transitionProgress + dt * 0.4);
+            const t = easeInOut(transitionProgress);
+            state.valence = lerp(state.valence, targetState.valence, t * 0.05);
+            state.arousal = lerp(state.arousal, targetState.arousal, t * 0.05);
+            state.intensity = lerp(state.intensity, targetState.intensity, t * 0.05);
+            state.dominantEmotion = targetState.dominantEmotion;
+            state.hasConflict = targetState.hasConflict;
+            state.activeEmotions = targetState.activeEmotions;
+            for (let k of Object.keys(state.drivers)) {
+                if (targetState.drivers[k]) {
+                    state.drivers[k].activation = lerp(state.drivers[k].activation, targetState.drivers[k].activation, t * 0.05);
+                    state.drivers[k].satisfaction = lerp(state.drivers[k].satisfaction, targetState.drivers[k].satisfaction, t * 0.05);
+                }
+            }
+        }
+
+        drawFace(dt);
+        updatePanel();
+        requestAnimationFrame(animate);
+    }
+
+    requestAnimationFrame(animate);
+    </script>
+</body>
+</html>
