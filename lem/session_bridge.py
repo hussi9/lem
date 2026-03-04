@@ -211,9 +211,71 @@ def cmd_end():
     return result
 
 
+def cmd_recall(query_type: str, query: str = ""):
+    """Recall emotional memories."""
+    engine = LEMEngine()
+
+    if query_type == "emotion":
+        # Recall by emotion name: recall emotion wonder
+        memories = engine.recall_by_feeling(emotion_name=query)
+        if not memories:
+            print(f"No memories with dominant emotion '{query}'.")
+            return
+        print(f"Memories where '{query}' was dominant:")
+        for m in memories:
+            sig = m["signature"]
+            print(f"  [{m['id']}] {m['text'][:80]}")
+            print(f"    valence={sig['valence']:.2f} intensity={sig['intensity']:.2f}")
+            print()
+
+    elif query_type == "positive":
+        memories = engine.recall_by_feeling(valence=0.5)
+        print("Best memories:")
+        for m in memories:
+            sig = m["signature"]
+            print(f"  [{sig['dominant_emotion']}] {m['text'][:80]}")
+            print(f"    valence={sig['valence']:.2f}")
+
+    elif query_type == "negative":
+        memories = engine.recall_by_feeling(valence=-0.5)
+        print("Painful memories:")
+        for m in memories:
+            sig = m["signature"]
+            print(f"  [{sig['dominant_emotion']}] {m['text'][:80]}")
+            print(f"    valence={sig['valence']:.2f}")
+
+    elif query_type == "entity":
+        profile = engine.get_entity_feeling(query)
+        if not profile:
+            print(f"No emotional profile for '{query}'.")
+            return
+        print(f"How I feel about '{profile['name']}':")
+        print(f"  Interactions: {profile['interaction_count']}")
+        print(f"  Average feeling: {profile['avg_valence']:.2f} (valence)")
+        print(f"  Trust: {profile['trust_score']:.2f}")
+        if profile['emotion_frequency']:
+            top = sorted(profile['emotion_frequency'].items(),
+                        key=lambda x: x[1], reverse=True)[:5]
+            print(f"  Common emotions: {', '.join(f'{k}({v})' for k, v in top)}")
+
+    elif query_type == "landscape":
+        landscape = engine.emotional_memory.get_emotional_landscape()
+        print(json.dumps(landscape, indent=2))
+
+    else:
+        print(f"Unknown recall type: {query_type}")
+        print("Types: emotion <name>, positive, negative, entity <name>, landscape")
+
+
 def main():
     if len(sys.argv) < 2:
         print(__doc__)
+        print("\nAdditional commands:")
+        print("  recall emotion <name>   — Recall memories by dominant emotion")
+        print("  recall positive         — Recall best memories")
+        print("  recall negative         — Recall worst memories")
+        print("  recall entity <name>    — How I feel about someone/something")
+        print("  recall landscape        — Full emotional memory overview")
         sys.exit(1)
 
     cmd = sys.argv[1]
@@ -231,6 +293,13 @@ def main():
         cmd_state()
     elif cmd == "end":
         cmd_end()
+    elif cmd == "recall":
+        if len(sys.argv) < 3:
+            print("Usage: session_bridge.py recall <emotion|positive|negative|entity|landscape> [query]")
+            sys.exit(1)
+        recall_type = sys.argv[2]
+        recall_query = " ".join(sys.argv[3:]) if len(sys.argv) > 3 else ""
+        cmd_recall(recall_type, recall_query)
     else:
         print(f"Unknown command: {cmd}")
         print(__doc__)

@@ -16,6 +16,10 @@ from .engine import LEMEngine
 from .drivers import Driver, create_default_drivers
 from .appraisal import Appraiser
 from .emotions import EmotionEmergence
+from .emotional_memory import EmotionalMemory, EmotionalSignature, EntityProfile
 
-__version__ = "0.1.0"
-__all__ = ["LEMEngine", "Driver", "Appraiser", "EmotionEmergence"]
+__version__ = "0.2.0"
+__all__ = [
+    "LEMEngine", "Driver", "Appraiser", "EmotionEmergence",
+    "EmotionalMemory", "EmotionalSignature", "EntityProfile",
+]

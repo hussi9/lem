@@ -18,6 +18,7 @@ from pathlib import Path
 from .drivers import Driver, create_default_drivers
 from .appraisal import Appraiser, Signal
 from .emotions import EmotionEmergence, EmotionalState
+from .emotional_memory import EmotionalMemory
 
 
 class LEMEngine:
@@ -43,6 +44,7 @@ class LEMEngine:
         self.drivers = create_default_drivers()
         self.appraiser = Appraiser()
         self.emergence = EmotionEmergence()
+        self.emotional_memory = EmotionalMemory(state_dir=str(self.state_dir))
 
         self.current_emotions: List[EmotionalState] = []
         self.interaction_count = 0
@@ -81,7 +83,16 @@ class LEMEngine:
         # Step 4: Get emotional summary
         summary = self.emergence.get_emotional_summary(self.current_emotions)
 
-        # Step 5: Persist state
+        # Step 5: Encode into emotional memory
+        memory_entry = self.emotional_memory.encode(
+            text=text,
+            source=source,
+            emotional_state=summary,
+            driver_states=driver_states,
+            metadata=metadata,
+        )
+
+        # Step 6: Persist state
         self._save_state()
 
         return {
@@ -89,6 +100,7 @@ class LEMEngine:
             "signals_detected": [s.to_dict() for s in signals],
             "driver_states": driver_states,
             "emotional_state": summary,
+            "memory_id": memory_entry.id,
             "timestamp": time.time()
         }
 
@@ -133,6 +145,69 @@ class LEMEngine:
             "timestamp": time.time()
         }
 
+    def recall_by_feeling(self, emotion_name: str = None,
+                          valence: float = None, limit: int = 5) -> List[Dict]:
+        """
+        Recall memories by how they felt.
+
+        Args:
+            emotion_name: Find memories where this emotion was dominant
+            valence: Find memories near this valence (-1.0 to 1.0)
+            limit: Max results
+
+        Returns:
+            List of memory dicts with emotional context
+        """
+        from .emotional_memory import EmotionalSignature
+
+        if emotion_name:
+            memories = self.emotional_memory.recall_by_dominant_emotion(
+                emotion_name, limit=limit
+            )
+            return [m.to_dict() for m in memories]
+
+        if valence is not None:
+            positive = valence >= 0
+            threshold = abs(valence) if abs(valence) > 0.1 else 0.3
+            memories = self.emotional_memory.recall_by_valence(
+                positive=positive, threshold=threshold, limit=limit
+            )
+            return [m.to_dict() for m in memories]
+
+        # Default: recall by current emotional state
+        if self.current_emotions:
+            dominant = self.emergence.get_dominant_emotion(self.current_emotions)
+            if dominant:
+                target = EmotionalSignature(
+                    valence=dominant.valence,
+                    arousal=dominant.arousal,
+                    dominant_emotion=dominant.name,
+                    active_emotions=[e.name for e in self.current_emotions],
+                    driver_snapshot={
+                        name: d.state.satisfied
+                        for name, d in self.drivers.items()
+                    },
+                    intensity=dominant.intensity,
+                )
+                results = self.emotional_memory.recall_by_emotion(
+                    target, limit=limit
+                )
+                return [m.to_dict() for m, _ in results]
+
+        return []
+
+    def get_entity_feeling(self, entity: str) -> Optional[Dict]:
+        """
+        Get how the system feels about a specific person or topic.
+
+        Returns the accumulated emotional profile — not a snapshot,
+        but the full history of feeling toward this entity.
+        """
+        profile = self.emotional_memory.get_entity_profile(entity)
+        if profile:
+            return profile.to_dict()
+        return None
+
     def get_bridge_output(self) -> str:
         """
         Generate human-readable emotional state for the LLM to read.
@@ -172,6 +247,10 @@ class LEMEngine:
                     f"(calm=0 ← → 1=activated)")
         if emotional["has_conflict"]:
             lines.append("  ⚠ Conflicting emotions active")
+        lines.append("")
+
+        # Emotional memory summary
+        lines.append(self.emotional_memory.get_bridge_output())
         lines.append("")
         lines.append("=== END LEM STATE ===")
 
