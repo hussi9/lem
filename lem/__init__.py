@@ -17,9 +17,12 @@ from .drivers import Driver, create_default_drivers
 from .appraisal import Appraiser
 from .emotions import EmotionEmergence
 from .emotional_memory import EmotionalMemory, EmotionalSignature, EntityProfile
+from .decay import DecayModel, DecayProfile
+from .discovery import EmotionDiscovery, PatternCluster
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __all__ = [
     "LEMEngine", "Driver", "Appraiser", "EmotionEmergence",
     "EmotionalMemory", "EmotionalSignature", "EntityProfile",
+    "DecayModel", "DecayProfile", "EmotionDiscovery", "PatternCluster",
 ]

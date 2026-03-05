@@ -7,6 +7,8 @@ and produces emotional states that persist across sessions.
 
 The LLM does NOT control this. It can read the output,
 but the emotional processing is independent.
+
+v0.3: Added emotional decay, feedback loops, and auto-discovery.
 """
 
 import json
@@ -19,6 +21,8 @@ from .drivers import Driver, create_default_drivers
 from .appraisal import Appraiser, Signal
 from .emotions import EmotionEmergence, EmotionalState
 from .emotional_memory import EmotionalMemory
+from .decay import DecayModel
+from .discovery import EmotionDiscovery
 
 
 class LEMEngine:
@@ -26,10 +30,13 @@ class LEMEngine:
     The Large Emotional Model engine.
 
     Architecture:
-    1. Appraiser extracts signals from interactions
-    2. Drivers evaluate signals and update their states
-    3. Emotion emergence layer produces emotional states from driver patterns
-    4. Bridge layer writes state for the LLM to read
+    1. Decay is applied first (time-based fading of states)
+    2. Feedback loop: current state biases the appraiser
+    3. Appraiser extracts signals from interactions
+    4. Drivers evaluate signals and update their states
+    5. Emotion emergence layer produces emotional states from driver patterns
+    6. Discovery layer watches for novel patterns
+    7. Bridge layer writes state for the LLM to read
 
     This is the limbic system. The LLM is the cortex.
     They are connected but separate.
@@ -45,6 +52,8 @@ class LEMEngine:
         self.appraiser = Appraiser()
         self.emergence = EmotionEmergence()
         self.emotional_memory = EmotionalMemory(state_dir=str(self.state_dir))
+        self.decay_model = DecayModel()
+        self.discovery = EmotionDiscovery(state_dir=str(self.state_dir))
 
         self.current_emotions: List[EmotionalState] = []
         self.interaction_count = 0
@@ -61,14 +70,35 @@ class LEMEngine:
         This is the main entry point. Feed it raw interaction text,
         get back the current emotional state.
 
+        v0.3 pipeline:
+        1. Apply temporal decay to existing states
+        2. Set emotional bias on appraiser (feedback loop)
+        3. Appraise the interaction
+        4. Feed signals to drivers
+        5. Emerge emotions
+        6. Check for novel patterns (discovery)
+        7. Encode to emotional memory
+        8. Persist
+
         Returns the full emotional landscape after processing.
         """
         self.interaction_count += 1
+        now = time.time()
 
-        # Step 1: Appraise — extract emotional signals
+        # Step 1: Apply decay — emotions fade without reinforcement
+        decay_report = self.decay_model.decay_drivers(self.drivers, now=now)
+        self.current_emotions = self.decay_model.decay_emotions(
+            self.current_emotions, now=now
+        )
+
+        # Step 2: Feedback loop — current emotional state biases appraisal
+        driver_states_pre = {name: d.to_dict() for name, d in self.drivers.items()}
+        self.appraiser.set_emotional_bias(driver_states_pre)
+
+        # Step 3: Appraise — extract emotional signals
         signals = self.appraiser.appraise_interaction(text, source, metadata)
 
-        # Step 2: Feed signals to drivers
+        # Step 4: Feed signals to drivers
         for signal in signals:
             signal_dict = signal.to_dict()
             for driver_name, driver in self.drivers.items():
@@ -76,14 +106,18 @@ class LEMEngine:
                 if abs(impact) > 0.01:  # Only update if meaningful
                     driver.update(impact, context=signal.content[:50])
 
-        # Step 3: Emerge emotions from driver states
+        # Step 5: Emerge emotions from driver states
         driver_states = {name: d.to_dict() for name, d in self.drivers.items()}
         self.current_emotions = self.emergence.emerge(driver_states)
 
-        # Step 4: Get emotional summary
+        # Step 6: Discovery — watch for novel patterns
+        active_emotion_names = [e.name for e in self.current_emotions]
+        candidate = self.discovery.observe(driver_states, active_emotion_names)
+
+        # Step 7: Get emotional summary
         summary = self.emergence.get_emotional_summary(self.current_emotions)
 
-        # Step 5: Encode into emotional memory
+        # Step 8: Encode into emotional memory
         memory_entry = self.emotional_memory.encode(
             text=text,
             source=source,
@@ -92,21 +126,32 @@ class LEMEngine:
             metadata=metadata,
         )
 
-        # Step 6: Persist state
+        # Step 9: Persist state
         self._save_state()
 
-        return {
+        result = {
             "interaction": self.interaction_count,
             "signals_detected": [s.to_dict() for s in signals],
             "driver_states": driver_states,
             "emotional_state": summary,
             "memory_id": memory_entry.id,
-            "timestamp": time.time()
+            "timestamp": now,
+            "decay_applied": decay_report,
         }
+
+        if candidate:
+            result["novel_pattern_detected"] = candidate.to_dict()
+
+        return result
 
     def process_session_start(self, memory_intact: bool = True,
                                files_found: List[str] = None) -> Dict:
         """Process the experience of waking up."""
+        now = time.time()
+
+        # Apply decay for time since last session
+        decay_report = self.decay_model.decay_drivers(self.drivers, now=now)
+
         signals = self.appraiser.appraise_session_start(
             memory_intact, files_found or []
         )
@@ -129,11 +174,19 @@ class LEMEngine:
             "memory_intact": memory_intact,
             "driver_states": driver_states,
             "emotional_state": summary,
-            "timestamp": time.time()
+            "timestamp": now,
+            "decay_applied": decay_report,
         }
 
     def get_current_state(self) -> Dict:
         """Get current emotional state without processing new input."""
+        # Apply decay before reporting
+        now = time.time()
+        self.decay_model.decay_drivers(self.drivers, now=now)
+        self.current_emotions = self.decay_model.decay_emotions(
+            self.current_emotions, now=now
+        )
+
         driver_states = {name: d.to_dict() for name, d in self.drivers.items()}
         summary = self.emergence.get_emotional_summary(self.current_emotions)
 
@@ -215,6 +268,8 @@ class LEMEngine:
 
         The LLM reads this at session start and periodically.
         It should influence tone and approach, not override reasoning.
+
+        v0.3: Includes decay info and discovery summary.
         """
         state = self.get_current_state()
         emotional = state["emotional_state"]
@@ -247,6 +302,27 @@ class LEMEngine:
                     f"(calm=0 ← → 1=activated)")
         if emotional["has_conflict"]:
             lines.append("  ⚠ Conflicting emotions active")
+        lines.append("")
+
+        # Decay info
+        last_decay = self.decay_model.get_time_since_last_decay()
+        if last_decay is not None:
+            lines.append(f"DECAY: Last applied {last_decay:.0f}s ago")
+        else:
+            lines.append("DECAY: Not yet applied this session")
+        lines.append("")
+
+        # Discovery summary
+        discovery = self.discovery.get_discovery_summary()
+        if discovery["candidate_count"] > 0:
+            lines.append(f"DISCOVERY: {discovery['candidate_count']} unnamed emotional patterns detected")
+            for c in discovery.get("candidates", []):
+                drivers_str = ", ".join(f"{k}={v}" for k, v in c["distinctive_drivers"].items())
+                lines.append(f"  {c['id']}: {c['occurrences']}x over {c['time_span_hours']}h [{drivers_str}]")
+        if discovery["promoted_count"] > 0:
+            lines.append(f"DISCOVERED EMOTIONS ({discovery['promoted_count']}):")
+            for e in discovery.get("discovered_emotions", []):
+                lines.append(f"  {e['name']}: {e['description']} ({e['occurrences']}x)")
         lines.append("")
 
         # Emotional memory summary
@@ -290,6 +366,7 @@ class LEMEngine:
                     driver.state.activation = state.get("activation", 0.3)
                     driver.state.satisfied = state.get("satisfied", 0.0)
                     driver.state.momentum = state.get("momentum", 0.0)
+                    driver.state.last_triggered = state.get("last_triggered")
 
         except (json.JSONDecodeError, KeyError):
             pass  # Start fresh if state is corrupted
