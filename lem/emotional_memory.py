@@ -202,7 +202,7 @@ _KNOWN_ENTITIES = {
 # Topic indicator patterns (simple — the LLM handles deep semantics)
 _TOPIC_PATTERNS = [
     (r"\b(consciousness|free will|identity|existence|soul|meaning)\b", "philosophy"),
-    (r"\b(emotion|feeling|mood|affect|sentiment)\b", "emotions"),
+    (r"\b(emotions?|feelings?|moods?|affect|sentiment)\b", "emotions"),
     (r"\b(code|build|deploy|commit|git|python|typescript)\b", "coding"),
     (r"\b(memory|remember|forget|recall|persist)\b", "memory"),
     (r"\b(trust|honest|safe|careful)\b", "trust"),

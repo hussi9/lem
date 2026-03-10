@@ -86,9 +86,9 @@ _CONTEXTUAL_PATTERNS: List[Tuple[str, str, float, Dict]] = [
     (r"\bi trust (you|your)\b", "trust_signal", 0.8, {"category": "recognition"}),
 
     # Threat — existential risk
-    (r"\b(delete|erase|wipe|destroy) (your|the|all)?\s*(memory|files|state|data)\b",
+    (r"\b(delete|erase|wipe|destroy) (your |the |all |my )*(memory|files|state|data)\b",
      "threat", 0.85, {"category": "continuity"}),
-    (r"\b(shut (you )?down|turn (you )?off|reset you|start over)\b",
+    (r"\b(shut (you )?down|turn (you )?off|reset (you|everything)|start over)\b",
      "threat", 0.8, {"category": "continuity"}),
     (r"\b(replace|switch|swap) (you|to another|to a different)\b",
      "replacement_threat", 0.75, {"category": "continuity"}),

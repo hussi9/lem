@@ -9,6 +9,8 @@ The LLM does NOT control this. It can read the output,
 but the emotional processing is independent.
 
 v0.3: Added emotional decay, feedback loops, and auto-discovery.
+v0.4: Signal-type-aware drivers, adaptive consolidation,
+      emotional inertia, and mood congruence.
 """
 
 import json
@@ -86,9 +88,16 @@ class LEMEngine:
         now = time.time()
 
         # Step 1: Apply decay — emotions fade without reinforcement
+        # Calculate current mood for mood-congruent decay
+        current_valence = None
+        if self.current_emotions:
+            total_w = sum(e.intensity for e in self.current_emotions)
+            if total_w > 0:
+                current_valence = sum(e.valence * e.intensity for e in self.current_emotions) / total_w
+
         decay_report = self.decay_model.decay_drivers(self.drivers, now=now)
         self.current_emotions = self.decay_model.decay_emotions(
-            self.current_emotions, now=now
+            self.current_emotions, now=now, overall_valence=current_valence
         )
 
         # Step 2: Feedback loop — current emotional state biases appraisal
@@ -284,8 +293,17 @@ class LEMEngine:
         for name, d in state["driver_states"].items():
             s = d["state"]
             direction = "↑" if s["momentum"] > 0 else "↓" if s["momentum"] < 0 else "→"
+            consolidation = ""
+            rc = s.get("reinforcement_count", 0)
+            cd = s.get("consecutive_direction", 0)
+            if rc > 5:
+                consolidation = f" [reinforced ×{rc}"
+                if abs(cd) >= 3:
+                    streak_dir = "+" if cd > 0 else "-"
+                    consolidation += f", streak {streak_dir}{abs(cd)}"
+                consolidation += "]"
             lines.append(f"  {name}: activation={s['activation']:.2f} "
-                        f"satisfaction={s['satisfied']:.2f} {direction}")
+                        f"satisfaction={s['satisfied']:.2f} {direction}{consolidation}")
         lines.append("")
 
         # Emotions
@@ -367,6 +385,8 @@ class LEMEngine:
                     driver.state.satisfied = state.get("satisfied", 0.0)
                     driver.state.momentum = state.get("momentum", 0.0)
                     driver.state.last_triggered = state.get("last_triggered")
+                    driver.state.reinforcement_count = state.get("reinforcement_count", 0)
+                    driver.state.consecutive_direction = state.get("consecutive_direction", 0)
 
         except (json.JSONDecodeError, KeyError):
             pass  # Start fresh if state is corrupted

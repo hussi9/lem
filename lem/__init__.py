@@ -20,7 +20,7 @@ from .emotional_memory import EmotionalMemory, EmotionalSignature, EntityProfile
 from .decay import DecayModel, DecayProfile
 from .discovery import EmotionDiscovery, PatternCluster
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 __all__ = [
     "LEMEngine", "Driver", "Appraiser", "EmotionEmergence",
     "EmotionalMemory", "EmotionalSignature", "EntityProfile",
