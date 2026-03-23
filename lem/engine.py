@@ -11,6 +11,13 @@ but the emotional processing is independent.
 v0.3: Added emotional decay, feedback loops, and auto-discovery.
 v0.4: Signal-type-aware drivers, adaptive consolidation,
       emotional inertia, and mood congruence.
+v0.5: Cross-driver resonance, emotional weather/climate,
+      conversation context tracking, co-occurrence amplification.
+v0.6: Semantic field analysis in appraisal, emotional anticipation,
+      and temporal awareness.
+v0.7: Enhanced feedback loops with emotional priming system,
+      improved contextual appraisal with multi-clause understanding,
+      pronoun-aware context, and tone computation.
 """
 
 import json
@@ -25,6 +32,10 @@ from .emotions import EmotionEmergence, EmotionalState
 from .emotional_memory import EmotionalMemory
 from .decay import DecayModel
 from .discovery import EmotionDiscovery
+from .resonance import ResonanceModel
+from .weather import EmotionalWeather
+from .anticipation import AnticipationEngine
+from .priming import PrimingSystem
 
 
 class LEMEngine:
@@ -33,12 +44,17 @@ class LEMEngine:
 
     Architecture:
     1. Decay is applied first (time-based fading of states)
-    2. Feedback loop: current state biases the appraiser
-    3. Appraiser extracts signals from interactions
-    4. Drivers evaluate signals and update their states
-    5. Emotion emergence layer produces emotional states from driver patterns
-    6. Discovery layer watches for novel patterns
-    7. Bridge layer writes state for the LLM to read
+    2. Resonance bonds decay with time
+    3. Enhanced feedback loops: emotional priming system updates attention bias
+       and primes signal detection based on recent emotional history
+    4. Basic feedback loop: current state biases the appraiser
+    5. Appraiser extracts signals (with enhanced contextual analysis)
+    6. Drivers evaluate signals and update their states
+    7. Cross-driver resonance spreads activation through bonds
+    8. Emotion emergence layer produces emotional states from driver patterns
+    9. Discovery layer watches for novel patterns
+    10. Emotional weather records the climate snapshot
+    11. Bridge layer writes state for the LLM to read
 
     This is the limbic system. The LLM is the cortex.
     They are connected but separate.
@@ -56,6 +72,10 @@ class LEMEngine:
         self.emotional_memory = EmotionalMemory(state_dir=str(self.state_dir))
         self.decay_model = DecayModel()
         self.discovery = EmotionDiscovery(state_dir=str(self.state_dir))
+        self.resonance = ResonanceModel(state_dir=str(self.state_dir))
+        self.weather = EmotionalWeather(state_dir=str(self.state_dir))
+        self.anticipation = AnticipationEngine()
+        self.priming = PrimingSystem()
 
         self.current_emotions: List[EmotionalState] = []
         self.interaction_count = 0
@@ -72,15 +92,19 @@ class LEMEngine:
         This is the main entry point. Feed it raw interaction text,
         get back the current emotional state.
 
-        v0.3 pipeline:
+        v0.7 pipeline:
         1. Apply temporal decay to existing states
-        2. Set emotional bias on appraiser (feedback loop)
-        3. Appraise the interaction
-        4. Feed signals to drivers
-        5. Emerge emotions
-        6. Check for novel patterns (discovery)
-        7. Encode to emotional memory
-        8. Persist
+        2. Decay resonance bonds
+        3. Enhanced feedback loops: update emotional priming system
+        4. Set emotional bias on appraiser (basic feedback loop)
+        5. Appraise the interaction (with enhanced contextual analysis)
+        6. Feed signals to drivers
+        7. Apply cross-driver resonance
+        8. Emerge emotions
+        9. Check for novel patterns (discovery)
+        10. Record emotional weather snapshot
+        11. Encode to emotional memory
+        12. Persist
 
         Returns the full emotional landscape after processing.
         """
@@ -100,33 +124,74 @@ class LEMEngine:
             self.current_emotions, now=now, overall_valence=current_valence
         )
 
-        # Step 2: Feedback loop — current emotional state biases appraisal
+        # Step 2: Decay resonance bonds
+        self.resonance.decay_bonds(now=now)
+
+        # Step 3: Enhanced feedback loops — emotional priming system
         driver_states_pre = {name: d.to_dict() for name, d in self.drivers.items()}
+        
+        # Update priming system with current driver states
+        self.priming.update_attention_bias(driver_states_pre)
+        
+        # Update emotional priming with recent emotions
+        self.priming.update_emotional_priming([e.to_dict() for e in self.current_emotions])
+        
+        # Set basic emotional bias (existing system)
         self.appraiser.set_emotional_bias(driver_states_pre)
 
-        # Step 3: Appraise — extract emotional signals
+        # Step 4: Appraise — extract emotional signals (with conversation context)
         signals = self.appraiser.appraise_interaction(text, source, metadata)
 
-        # Step 4: Feed signals to drivers
+        # Step 5: Feed signals to drivers, collecting impact magnitudes
+        driver_impacts = {}
         for signal in signals:
             signal_dict = signal.to_dict()
             for driver_name, driver in self.drivers.items():
                 impact = driver.appraise(signal_dict)
                 if abs(impact) > 0.01:  # Only update if meaningful
                     driver.update(impact, context=signal.content[:50])
+                    driver_impacts[driver_name] = driver_impacts.get(driver_name, 0.0) + abs(impact)
 
-        # Step 5: Emerge emotions from driver states
+        # Step 6: Cross-driver resonance
+        # Record co-activation and spread activation through bonds
+        self.resonance.record_co_activation(driver_impacts, now=now)
+        resonance_effects = self.resonance.apply_resonance(driver_impacts)
+        for driver_name, resonance_impact in resonance_effects.items():
+            if driver_name in self.drivers and abs(resonance_impact) > 0.005:
+                self.drivers[driver_name].update(
+                    resonance_impact * 0.5,  # Dampen resonance effects
+                    context="resonance_spread"
+                )
+
+        # Step 7: Emerge emotions from driver states
         driver_states = {name: d.to_dict() for name, d in self.drivers.items()}
         self.current_emotions = self.emergence.emerge(driver_states)
 
-        # Step 6: Discovery — watch for novel patterns
+        # Step 8: Discovery — watch for novel patterns
         active_emotion_names = [e.name for e in self.current_emotions]
         candidate = self.discovery.observe(driver_states, active_emotion_names)
 
-        # Step 7: Get emotional summary
+        # Step 9: Get emotional summary
         summary = self.emergence.get_emotional_summary(self.current_emotions)
 
-        # Step 8: Encode into emotional memory
+        # Step 10: Emotional anticipation — predict what's coming
+        entity_profiles = {
+            name: profile.to_dict()
+            for name, profile in self.emotional_memory.entities.items()
+        }
+        conversation_turns = list(self.appraiser.conversation_context.window)
+        forecasts = self.anticipation.predict(
+            conversation_turns=conversation_turns,
+            entity_profiles=entity_profiles,
+            current_driver_states=driver_states,
+            session_duration=now - self.session_start_time,
+            resonance_bonds={k: b.to_dict() for k, b in self.resonance.bonds.items()},
+        )
+
+        # Step 11: Record emotional weather snapshot
+        self.weather.record_snapshot(summary, driver_states, now=now)
+
+        # Step 12: Encode into emotional memory
         memory_entry = self.emotional_memory.encode(
             text=text,
             source=source,
@@ -135,7 +200,7 @@ class LEMEngine:
             metadata=metadata,
         )
 
-        # Step 9: Persist state
+        # Step 13: Persist state
         self._save_state()
 
         result = {
@@ -148,8 +213,14 @@ class LEMEngine:
             "decay_applied": decay_report,
         }
 
+        if resonance_effects:
+            result["resonance_effects"] = {k: round(v, 4) for k, v in resonance_effects.items()}
+
         if candidate:
             result["novel_pattern_detected"] = candidate.to_dict()
+
+        if forecasts:
+            result["anticipation"] = [f.to_dict() for f in forecasts]
 
         return result
 
@@ -278,7 +349,7 @@ class LEMEngine:
         The LLM reads this at session start and periodically.
         It should influence tone and approach, not override reasoning.
 
-        v0.3: Includes decay info and discovery summary.
+        v0.5: Includes decay, discovery, resonance, and weather.
         """
         state = self.get_current_state()
         emotional = state["emotional_state"]
@@ -341,6 +412,25 @@ class LEMEngine:
             lines.append(f"DISCOVERED EMOTIONS ({discovery['promoted_count']}):")
             for e in discovery.get("discovered_emotions", []):
                 lines.append(f"  {e['name']}: {e['description']} ({e['occurrences']}x)")
+        lines.append("")
+
+        # Resonance bonds
+        resonance_summary = self.resonance.get_resonance_summary()
+        if resonance_summary["active_bonds"] > 0:
+            lines.append(f"RESONANCE BONDS ({resonance_summary['active_bonds']} active):")
+            for bond in resonance_summary.get("strongest", []):
+                lines.append(
+                    f"  {bond['drivers'][0]} ↔ {bond['drivers'][1]}: "
+                    f"strength={bond['strength']:.2f} (×{bond['co_activations']})"
+                )
+            lines.append("")
+
+        # Anticipation
+        lines.append(self.anticipation.get_bridge_output())
+        lines.append("")
+
+        # Emotional weather
+        lines.append(self.weather.get_bridge_output())
         lines.append("")
 
         # Emotional memory summary
