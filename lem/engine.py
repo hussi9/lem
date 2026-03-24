@@ -36,6 +36,7 @@ from .resonance import ResonanceModel
 from .weather import EmotionalWeather
 from .anticipation import AnticipationEngine
 from .priming import PrimingSystem
+from .behavioral import BehavioralEngine, BehavioralProfile
 
 
 class LEMEngine:
@@ -76,6 +77,7 @@ class LEMEngine:
         self.weather = EmotionalWeather(state_dir=str(self.state_dir))
         self.anticipation = AnticipationEngine()
         self.priming = PrimingSystem()
+        self.behavioral = BehavioralEngine(state_dir=str(self.state_dir))
 
         self.current_emotions: List[EmotionalState] = []
         self.interaction_count = 0
@@ -341,6 +343,16 @@ class LEMEngine:
             return profile.to_dict()
         return None
 
+    def get_behavioral_profile(self) -> BehavioralProfile:
+        """Get behavioral directives from current emotional state."""
+        state = self.get_current_state()
+        return self.behavioral.compute(state)
+
+    def record_task_outcome(self, task_type: str, success: bool):
+        """Record whether a task succeeded — feeds back into behavioral learning."""
+        state = self.get_current_state()
+        self.behavioral.record_outcome(task_type, success, state)
+
     def get_bridge_output(self) -> str:
         """
         Generate human-readable emotional state for the LLM to read.
@@ -437,6 +449,12 @@ class LEMEngine:
         lines.append(self.emotional_memory.get_bridge_output())
         lines.append("")
         lines.append("=== END LEM STATE ===")
+        lines.append("")
+
+        # Behavioral directives — the ACTION output of emotions
+        state = self.get_current_state()
+        behavioral_profile = self.behavioral.compute(state)
+        lines.append(behavioral_profile.get_bridge_text())
 
         return "\n".join(lines)
 

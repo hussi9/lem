@@ -293,6 +293,22 @@ def main():
         cmd_state()
     elif cmd == "end":
         cmd_end()
+    elif cmd == "outcome":
+        # Record task outcome for behavioral feedback learning
+        # Usage: session_bridge.py outcome <task_type> <success|failure>
+        if len(sys.argv) < 4:
+            print("Usage: session_bridge.py outcome <task_type> <success|failure>")
+            sys.exit(1)
+        task_type = sys.argv[2]
+        success = sys.argv[3].lower() in ("success", "true", "1", "yes")
+        engine = LEMEngine()
+        engine.record_task_outcome(task_type, success)
+        print(f"✓ Recorded outcome: {task_type} = {'success' if success else 'failure'}")
+    elif cmd == "behavioral":
+        # Show current behavioral directives
+        engine = LEMEngine()
+        profile = engine.get_behavioral_profile()
+        print(profile.get_bridge_text())
     elif cmd == "recall":
         if len(sys.argv) < 3:
             print("Usage: session_bridge.py recall <emotion|positive|negative|entity|landscape> [query]")
