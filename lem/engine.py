@@ -18,6 +18,9 @@ v0.6: Semantic field analysis in appraisal, emotional anticipation,
 v0.7: Enhanced feedback loops with emotional priming system,
       improved contextual appraisal with multi-clause understanding,
       pronoun-aware context, and tone computation.
+v0.8: Emotional regulation (habituation, reappraisal, homeostasis,
+      oscillation damping) and emotional blending (smooth transitions
+      between states, detection of emergent blend experiences).
 """
 
 import json
@@ -37,6 +40,8 @@ from .weather import EmotionalWeather
 from .anticipation import AnticipationEngine
 from .priming import PrimingSystem
 from .behavioral import BehavioralEngine, BehavioralProfile
+from .regulation import RegulationEngine
+from .blending import BlendEngine
 
 
 class LEMEngine:
@@ -50,12 +55,15 @@ class LEMEngine:
        and primes signal detection based on recent emotional history
     4. Basic feedback loop: current state biases the appraiser
     5. Appraiser extracts signals (with enhanced contextual analysis)
-    6. Drivers evaluate signals and update their states
-    7. Cross-driver resonance spreads activation through bonds
-    8. Emotion emergence layer produces emotional states from driver patterns
-    9. Discovery layer watches for novel patterns
-    10. Emotional weather records the climate snapshot
-    11. Bridge layer writes state for the LLM to read
+    6. **Regulation** — habituation, reappraisal under extreme states (v0.8)
+    7. Drivers evaluate signals and update their states
+    8. **Homeostatic regulation** of driver states (v0.8)
+    9. Cross-driver resonance spreads activation through bonds
+    10. Emotion emergence layer produces emotional states from driver patterns
+    11. **Emotional blending** — smooth transitions + blend detection (v0.8)
+    12. Discovery layer watches for novel patterns
+    13. Emotional weather records the climate snapshot
+    14. Bridge layer writes state for the LLM to read
 
     This is the limbic system. The LLM is the cortex.
     They are connected but separate.
@@ -78,6 +86,8 @@ class LEMEngine:
         self.anticipation = AnticipationEngine()
         self.priming = PrimingSystem()
         self.behavioral = BehavioralEngine(state_dir=str(self.state_dir))
+        self.regulation = RegulationEngine()
+        self.blending = BlendEngine()
 
         self.current_emotions: List[EmotionalState] = []
         self.interaction_count = 0
@@ -144,7 +154,12 @@ class LEMEngine:
         # Step 4: Appraise — extract emotional signals (with conversation context)
         signals = self.appraiser.appraise_interaction(text, source, metadata)
 
-        # Step 5: Feed signals to drivers, collecting impact magnitudes
+        # Step 5: Regulation — habituation + reappraisal before driver updates
+        signals, regulation_report = self.regulation.regulate_signals(
+            signals, driver_states_pre, now=now
+        )
+
+        # Step 6: Feed signals to drivers, collecting impact magnitudes
         driver_impacts = {}
         for signal in signals:
             signal_dict = signal.to_dict()
@@ -154,7 +169,10 @@ class LEMEngine:
                     driver.update(impact, context=signal.content[:50])
                     driver_impacts[driver_name] = driver_impacts.get(driver_name, 0.0) + abs(impact)
 
-        # Step 6: Cross-driver resonance
+        # Step 7: Homeostatic regulation of driver states
+        homeostatic_report = self.regulation.regulate_drivers(self.drivers, now=now)
+
+        # Step 8: Cross-driver resonance
         # Record co-activation and spread activation through bonds
         self.resonance.record_co_activation(driver_impacts, now=now)
         resonance_effects = self.resonance.apply_resonance(driver_impacts)
@@ -165,18 +183,21 @@ class LEMEngine:
                     context="resonance_spread"
                 )
 
-        # Step 7: Emerge emotions from driver states
+        # Step 9: Emerge emotions from driver states
         driver_states = {name: d.to_dict() for name, d in self.drivers.items()}
-        self.current_emotions = self.emergence.emerge(driver_states)
+        raw_emotions = self.emergence.emerge(driver_states)
 
-        # Step 8: Discovery — watch for novel patterns
+        # Step 10: Emotional blending — smooth transitions + blend detection
+        self.current_emotions = self.blending.apply(raw_emotions, now=now)
+
+        # Step 11: Discovery — watch for novel patterns
         active_emotion_names = [e.name for e in self.current_emotions]
         candidate = self.discovery.observe(driver_states, active_emotion_names)
 
-        # Step 9: Get emotional summary
+        # Step 12: Get emotional summary
         summary = self.emergence.get_emotional_summary(self.current_emotions)
 
-        # Step 10: Emotional anticipation — predict what's coming
+        # Step 13: Emotional anticipation — predict what's coming
         entity_profiles = {
             name: profile.to_dict()
             for name, profile in self.emotional_memory.entities.items()
@@ -190,10 +211,10 @@ class LEMEngine:
             resonance_bonds={k: b.to_dict() for k, b in self.resonance.bonds.items()},
         )
 
-        # Step 11: Record emotional weather snapshot
+        # Step 14: Record emotional weather snapshot
         self.weather.record_snapshot(summary, driver_states, now=now)
 
-        # Step 12: Encode into emotional memory
+        # Step 15: Encode into emotional memory
         memory_entry = self.emotional_memory.encode(
             text=text,
             source=source,
@@ -202,7 +223,7 @@ class LEMEngine:
             metadata=metadata,
         )
 
-        # Step 13: Persist state
+        # Step 16: Persist state
         self._save_state()
 
         result = {
@@ -214,6 +235,16 @@ class LEMEngine:
             "timestamp": now,
             "decay_applied": decay_report,
         }
+
+        if regulation_report.get("habituation_applied") or regulation_report.get("reappraisals"):
+            result["regulation"] = regulation_report
+
+        if any(abs(v) > 0.001 for v in homeostatic_report.values()):
+            result["homeostatic_adjustments"] = homeostatic_report
+
+        active_blends = self.blending.get_active_blends()
+        if active_blends:
+            result["active_blends"] = active_blends
 
         if resonance_effects:
             result["resonance_effects"] = {k: round(v, 4) for k, v in resonance_effects.items()}
@@ -443,6 +474,22 @@ class LEMEngine:
 
         # Emotional weather
         lines.append(self.weather.get_bridge_output())
+        lines.append("")
+
+        # Regulation state
+        lines.append(self.regulation.get_bridge_output())
+        lines.append("")
+
+        # Emotional blending
+        active_blends = self.blending.get_active_blends()
+        if active_blends:
+            lines.append(f"BLENDS ({len(active_blends)} active): {', '.join(active_blends)}")
+        transitions = self.blending.get_transition_info()
+        if transitions:
+            transitioning = [f"{n} {t['direction']}" for n, t in transitions.items()
+                           if abs(t['current'] - t['target']) > 0.05]
+            if transitioning:
+                lines.append(f"TRANSITIONS: {', '.join(transitioning)}")
         lines.append("")
 
         # Emotional memory summary
