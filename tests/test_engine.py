@@ -91,6 +91,34 @@ class TestEngineIntegration:
         # The signal for no memory is stronger (intensity 0.6 vs 0.3)
         assert result["memory_intact"] is False
 
+    def test_persisted_emotions_survive_restart(self):
+        """Current emotions should reload across engine instances."""
+        first = self.engine.process_interaction(
+            "What do you really think about consciousness and existence?",
+            source="human"
+        )
+        assert first["emotional_state"]["active_count"] >= 1
+
+        reloaded = LEMEngine(state_dir=self.tmpdir)
+        state = reloaded.get_current_state()
+
+        assert state["emotional_state"]["active_count"] >= 1
+        assert state["emotional_state"]["dominant"] is not None
+
+    def test_conversation_context_survives_restart(self):
+        """Recent conversational flow should persist across restarts."""
+        self.engine.process_interaction("How do you feel about this?", source="human")
+        self.engine.process_interaction("I trust your judgment here.", source="human")
+
+        reloaded = LEMEngine(state_dir=self.tmpdir)
+        assert reloaded.appraiser.conversation_context.recent_turn_count() >= 2
+
+    def test_session_start_records_weather_snapshot(self):
+        """Startup flow should update weather so the bridge reflects waking state."""
+        before = len(self.engine.weather.snapshots)
+        self.engine.process_session_start(memory_intact=True, files_found=["SOUL.md"])
+        assert len(self.engine.weather.snapshots) == before + 1
+
     def test_bridge_output_is_readable(self):
         """Bridge output should be a non-empty string."""
         self.engine.process_interaction("Test interaction", source="human")

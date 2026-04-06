@@ -30,7 +30,7 @@ from typing import Dict, List, Optional
 from pathlib import Path
 
 from .drivers import Driver, create_default_drivers
-from .appraisal import Appraiser, Signal
+from .appraisal import Appraiser, Signal, ConversationTurn
 from .emotions import EmotionEmergence, EmotionalState
 from .emotional_memory import EmotionalMemory
 from .decay import DecayModel
@@ -262,24 +262,47 @@ class LEMEngine:
         """Process the experience of waking up."""
         now = time.time()
 
-        # Apply decay for time since last session
+        # Apply decay for time since last session, including lingering emotions.
+        current_valence = None
+        if self.current_emotions:
+            total_w = sum(e.intensity for e in self.current_emotions)
+            if total_w > 0:
+                current_valence = sum(e.valence * e.intensity for e in self.current_emotions) / total_w
+
         decay_report = self.decay_model.decay_drivers(self.drivers, now=now)
+        self.current_emotions = self.decay_model.decay_emotions(
+            self.current_emotions, now=now, overall_valence=current_valence
+        )
+        self.resonance.decay_bonds(now=now)
+
+        # Feed the pre-wake state back into appraisal so startup benefits from continuity.
+        driver_states_pre = {name: d.to_dict() for name, d in self.drivers.items()}
+        self.priming.update_attention_bias(driver_states_pre)
+        self.priming.update_emotional_priming([e.to_dict() for e in self.current_emotions])
+        self.appraiser.set_emotional_bias(driver_states_pre)
 
         signals = self.appraiser.appraise_session_start(
             memory_intact, files_found or []
         )
 
+        driver_impacts = {}
         for signal in signals:
             signal_dict = signal.to_dict()
             for driver_name, driver in self.drivers.items():
                 impact = driver.appraise(signal_dict)
                 if abs(impact) > 0.01:
                     driver.update(impact, context="session_start")
+                    driver_impacts[driver_name] = driver_impacts.get(driver_name, 0.0) + abs(impact)
+
+        if driver_impacts:
+            self.resonance.record_co_activation(driver_impacts, now=now)
 
         driver_states = {name: d.to_dict() for name, d in self.drivers.items()}
-        self.current_emotions = self.emergence.emerge(driver_states)
+        raw_emotions = self.emergence.emerge(driver_states)
+        self.current_emotions = self.blending.apply(raw_emotions, now=now)
         summary = self.emergence.get_emotional_summary(self.current_emotions)
 
+        self.weather.record_snapshot(summary, driver_states, now=now)
         self._save_state()
 
         return {
@@ -507,6 +530,58 @@ class LEMEngine:
 
     # === Persistence ===
 
+    def _serialize_conversation_context(self) -> List[Dict]:
+        """Persist recent conversational context for startup continuity."""
+        turns = []
+        for turn in list(self.appraiser.conversation_context.window):
+            turns.append({
+                "text": turn.text,
+                "source": turn.source,
+                "timestamp": turn.timestamp,
+                "word_count": turn.word_count,
+                "signal_types": list(turn.signal_types),
+                "categories": list(turn.categories),
+                "valence_hint": turn.valence_hint,
+            })
+        return turns
+
+    def _deserialize_conversation_context(self, turns: List[Dict]):
+        """Restore recent conversational context for better session startup flow."""
+        for turn_data in turns or []:
+            try:
+                turn = ConversationTurn(
+                    text=turn_data.get("text", ""),
+                    source=turn_data.get("source", "human"),
+                    timestamp=turn_data.get("timestamp", time.time()),
+                    word_count=turn_data.get("word_count", 0),
+                    signal_types=list(turn_data.get("signal_types", [])),
+                    categories=list(turn_data.get("categories", [])),
+                    valence_hint=turn_data.get("valence_hint", 0.0),
+                )
+                self.appraiser.conversation_context.add_turn(turn)
+            except Exception:
+                continue
+
+    def _restore_emotions(self, emotions_data: List[Dict]):
+        """Restore persisted emotional states so startup begins with continuity."""
+        restored = []
+        for e in emotions_data or []:
+            try:
+                restored.append(EmotionalState(
+                    name=e["name"],
+                    intensity=e["intensity"],
+                    valence=e["valence"],
+                    arousal=e["arousal"],
+                    source_drivers=list(e.get("source_drivers", [])),
+                    is_compound=e.get("is_compound", False),
+                    is_conflict=e.get("is_conflict", False),
+                    description=e.get("description", ""),
+                    timestamp=e.get("timestamp", time.time()),
+                ))
+            except (KeyError, TypeError):
+                continue
+        self.current_emotions = restored
+
     def _save_state(self):
         """Persist driver states to disk."""
         state = {
@@ -514,6 +589,7 @@ class LEMEngine:
             "interaction_count": self.interaction_count,
             "drivers": {name: d.to_dict() for name, d in self.drivers.items()},
             "current_emotions": [e.to_dict() for e in self.current_emotions],
+            "conversation_context": self._serialize_conversation_context(),
         }
         state_file = self.state_dir / "driver_state.json"
         with open(state_file, "w") as f:
@@ -543,5 +619,8 @@ class LEMEngine:
                     driver.state.reinforcement_count = state.get("reinforcement_count", 0)
                     driver.state.consecutive_direction = state.get("consecutive_direction", 0)
 
-        except (json.JSONDecodeError, KeyError):
+            self._restore_emotions(data.get("current_emotions", []))
+            self._deserialize_conversation_context(data.get("conversation_context", []))
+
+        except (json.JSONDecodeError, KeyError, TypeError):
             pass  # Start fresh if state is corrupted
