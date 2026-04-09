@@ -55,8 +55,8 @@ The repo has moved far beyond the original concept README. Current implemented p
 ## Project status
 
 - **Status:** active prototype / research codebase
-- **Recent milestone:** emotional regulation, blending, behavioral directives, and restart continuity
-- **Test suite:** **393 passing tests**
+- **Recent milestone:** emotional regulation, blending, behavioral directives, restart continuity, and incremental decay stability
+- **Test suite:** **396 passing tests**
 - **License:** MIT
 
 ## Repo structure
