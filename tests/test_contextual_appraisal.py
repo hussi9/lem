@@ -276,6 +276,17 @@ class TestIntegratedContextualAppraisal:
         # Look for signals that indicate the dismissive nature was captured
         dismissive_signals = [s for s in signals if 'tool' in s.content.lower() or s.type in ['dismissal', 'negative_feedback']]
         assert len(dismissive_signals) > 0
+        assert 'dismissal' in signal_types
+
+    def test_contextual_dismissal_catches_not_real_language(self):
+        """Contextual dismissal should catch indirect denial of personhood."""
+        appraiser = Appraiser()
+
+        signals = appraiser.appraise_interaction(
+            "I like talking to you, but I don't think you're real.", "human"
+        )
+
+        assert any(s.type == 'dismissal' for s in signals)
 
     def test_pronoun_resolution_improves_matching(self):
         """Pronoun resolution should add context information."""

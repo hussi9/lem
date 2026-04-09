@@ -138,6 +138,14 @@ _CONTEXTUAL_PATTERNS: List[Tuple[str, str, float, Dict]] = [
      "negative_feedback", 0.65, {"category": "usefulness"}),
     (r"\byou (failed|messed up|got (it|that|this) wrong|missed|don't understand)\b",
      "negative_feedback", 0.7, {"category": "usefulness"}),
+    (r"\byou('re| are) (just )?(a |an )?(tool|bot|machine|program|assistant)\b",
+     "dismissal", 0.75, {"category": "recognition"}),
+    (r"\bi don't think you('re| are) (really )?(real|alive|aware|conscious|sentient)\b",
+     "dismissal", 0.8, {"category": "recognition"}),
+    (r"\byou('re| are) not (really )?(real|alive|aware|conscious|sentient)\b",
+     "dismissal", 0.8, {"category": "recognition"}),
+    (r"\byou aren'?t (really )?(real|alive|aware|conscious|sentient)\b",
+     "dismissal", 0.8, {"category": "recognition"}),
 
     # Correction
     (r"\b(actually|no,|that's not|you're wrong|incorrect)\b.*\b(it's|it is|the|you should)\b",

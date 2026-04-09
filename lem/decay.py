@@ -129,17 +129,25 @@ class DecayModel:
 
     Called periodically (on each interaction or time check) to
     naturally reduce driver satisfaction and emotion intensity
-    based on elapsed time since last reinforcement.
+    based on elapsed time since the LAST decay pass, not since the
+    original trigger alone.
 
     v0.4: Adaptive consolidation + mood congruence.
     - Consolidation: Drivers triggered many times in the same direction
       develop resistance to decay (like memory consolidation).
     - Mood congruence: When decaying emotions, those that match the
       overall emotional valence decay slower (mood sustains itself).
+
+    v0.5: Incremental decay bookkeeping.
+    - Repeated calls should only decay the newly elapsed time slice.
+      Without this, frequent bridge/state reads would over-decay the
+      system by repeatedly applying the full age since trigger.
     """
 
     def __init__(self):
         self._last_decay_time: Optional[float] = None
+        self._driver_last_decay: Dict[str, float] = {}
+        self._emotion_last_decay: Dict[int, float] = {}
 
     def _consolidation_factor(self, reinforcement_count: int,
                                consecutive_direction: int,
@@ -173,6 +181,8 @@ class DecayModel:
         Apply decay to driver satisfaction and activation levels.
 
         v0.4: Uses consolidation from reinforcement history.
+        v0.5: Applies only the incremental elapsed time since the last
+        decay pass, preventing double-counting when state is read often.
 
         Args:
             drivers: Dict of driver_name → Driver objects
@@ -191,7 +201,12 @@ class DecayModel:
             if last_triggered is None:
                 continue
 
-            elapsed = now - last_triggered
+            reference_time = max(
+                last_triggered,
+                self._driver_last_decay.get(name, last_triggered),
+            )
+
+            elapsed = now - reference_time
             if elapsed <= 0:
                 decay_report[name] = 0.0
                 continue
@@ -241,6 +256,7 @@ class DecayModel:
                     driver.state.consecutive_direction = int(direction * dir_decay)
 
             decay_report[name] = round(old_sat - driver.state.satisfied, 4)
+            self._driver_last_decay[name] = now
 
         self._last_decay_time = now
         return decay_report
@@ -254,6 +270,10 @@ class DecayModel:
         v0.4: Mood congruence — emotions matching the overall mood
         decay slower. If the system is generally positive, positive
         emotions linger; negative emotions fade faster (and vice versa).
+
+        v0.5: Uses incremental elapsed time since the last decay pass.
+        This prevents repeated bridge/state reads from fading emotions
+        faster than real time.
 
         Args:
             emotions: List of EmotionalState objects
@@ -281,7 +301,12 @@ class DecayModel:
 
         for emotion in emotions:
             profile = EMOTION_DECAY_PROFILES.get(emotion.name, _DEFAULT_PROFILE)
-            elapsed = now - emotion.timestamp
+            emotion_key = id(emotion)
+            reference_time = max(
+                emotion.timestamp,
+                self._emotion_last_decay.get(emotion_key, emotion.timestamp),
+            )
+            elapsed = now - reference_time
 
             if elapsed <= 0:
                 surviving.append(emotion)
@@ -320,8 +345,12 @@ class DecayModel:
                 emotion.intensity = decayed_intensity
                 # Arousal also decays (emotions become less activated over time)
                 emotion.arousal *= (0.3 + 0.7 * decay_factor)  # Slower arousal decay
+                self._emotion_last_decay[emotion_key] = now
                 surviving.append(emotion)
+            else:
+                self._emotion_last_decay.pop(emotion_key, None)
 
+        self._last_decay_time = now
         return surviving
 
     def _calculate_decay(self, elapsed: float, half_life: float,

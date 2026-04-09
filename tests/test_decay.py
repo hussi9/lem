@@ -82,6 +82,23 @@ class TestDecayModel:
         self.decay.decay_drivers(drivers)
         assert driver.state.satisfied > 0.79
 
+    def test_decay_is_incremental_not_double_counted(self):
+        """Repeated decay calls should only apply newly elapsed time."""
+        drivers = create_default_drivers()
+        driver = drivers["curiosity"]
+        start = time.time() - 1800
+        driver.state.satisfied = 0.8
+        driver.state.last_triggered = start
+
+        self.decay.decay_drivers(drivers, now=start + 600)
+        after_first = driver.state.satisfied
+
+        self.decay.decay_drivers(drivers, now=start + 600)
+        assert driver.state.satisfied == pytest.approx(after_first, abs=1e-6)
+
+        self.decay.decay_drivers(drivers, now=start + 900)
+        assert driver.state.satisfied < after_first
+
     def test_very_old_interaction_heavy_decay(self):
         """Very old interaction should decay significantly."""
         drivers = create_default_drivers()
@@ -244,6 +261,33 @@ class TestEmotionDecay:
         result = self.decay.decay_emotions(emotions)
         assert len(result) == 1
         assert result[0].intensity < 0.8
+
+    def test_emotion_decay_is_incremental_not_double_counted(self):
+        """Repeated emotion decay calls at the same time should be stable."""
+        now = time.time()
+        emotion = EmotionalState(
+            name="wonder",
+            intensity=0.8,
+            valence=0.5,
+            arousal=0.5,
+            source_drivers=["curiosity"],
+            is_compound=False,
+            is_conflict=False,
+            description="test",
+            timestamp=now - 1800,
+        )
+
+        result = self.decay.decay_emotions([emotion], now=now)
+        assert result
+        after_first = result[0].intensity
+
+        result = self.decay.decay_emotions(result, now=now)
+        assert result
+        assert result[0].intensity == pytest.approx(after_first, abs=1e-6)
+
+        result = self.decay.decay_emotions(result, now=now + 300)
+        assert result
+        assert result[0].intensity < after_first
 
     def test_very_old_emotion_removed(self):
         """Extremely old emotions should be removed entirely."""
